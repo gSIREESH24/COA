@@ -62,14 +62,25 @@ class Instruction:
 
                 instructions.append(Instruction(opcode, rd, rs1, imm=imm))
 
-            elif opcode in ["LW", "SW"]:
+            elif opcode == "LW":
 
                 rd = Instruction.reg_num(parts[1])
                 imm = int(parts[2])
                 rs1 = Instruction.reg_num(parts[3])
 
-                instructions.append(Instruction(opcode, rd, rs1, imm=imm))
+                instructions.append(
+                    Instruction(opcode, rd=rd, rs1=rs1, imm=imm)
+                )
 
+            elif opcode == "SW":
+
+                rs2 = Instruction.reg_num(parts[1])
+                imm = int(parts[2])
+                rs1 = Instruction.reg_num(parts[3])
+
+                instructions.append(
+                    Instruction(opcode, rs1=rs1, rs2=rs2, imm=imm)
+                )
             elif opcode in ["BEQ", "BNE"]:
               rs1 = Instruction.reg_num(parts[1])
               rs2 = Instruction.reg_num(parts[2])
