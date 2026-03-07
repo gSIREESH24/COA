@@ -2,6 +2,7 @@ import sys
 from parser import Parser
 from cpu import Cpu
 from executor import run_program
+from pipeline import run_pipeline
 
 
 def main():
@@ -21,7 +22,7 @@ def main():
 
     cpu = Cpu()
 
-    run_program(cpu, instructions)
+    run_pipeline(cpu, instructions, verbose=True)
 
     print("\nFinal CPU state:")
     print(cpu)
