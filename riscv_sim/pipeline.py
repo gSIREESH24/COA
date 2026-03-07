@@ -1,10 +1,10 @@
 def will_write_rd(instr):
     if instr is None:
         return False
-    return instr.opcode in ("ADD","SUB","ADDI","LW","JAL") and instr.rd is not None
+    return instr.opcode in ("ADD", "SUB", "ADDI", "LW", "JAL") and instr.rd is not None
 
 
-def run_pipeline(cpu, instructions, max_cycles=100000, verbose=False):
+def run_pipeline(cpu, instructions, config, max_cycles=100000, verbose=False):
 
     pc = cpu.pc
 
@@ -19,7 +19,7 @@ def run_pipeline(cpu, instructions, max_cycles=100000, verbose=False):
 
     def fetch(pc):
         if pc // 4 < len(instructions):
-            return instructions[pc//4]
+            return instructions[pc // 4]
         return None
 
 
@@ -38,7 +38,6 @@ def run_pipeline(cpu, instructions, max_cycles=100000, verbose=False):
         new_mem_wb = None
 
         if ex_mem:
-
             instr = ex_mem.get("instr")
 
             if instr:
@@ -48,55 +47,67 @@ def run_pipeline(cpu, instructions, max_cycles=100000, verbose=False):
                     addr = ex_mem["alu"]
                     val = cpu.load(addr)
 
-                    new_mem_wb = {"instr":instr,"val":val}
+                    new_mem_wb = {"instr": instr, "val": val}
 
                 elif instr.opcode == "SW":
 
-                    cpu.store(ex_mem["alu"],ex_mem["store"])
-                    new_mem_wb = {"instr":None}
+                    cpu.store(ex_mem["alu"], ex_mem["store"])
+                    new_mem_wb = {"instr": None}
 
                 else:
 
-                    new_mem_wb = {"instr":instr,"val":ex_mem["alu"]}
+                    new_mem_wb = {"instr": instr, "val": ex_mem["alu"]}
 
 
         # ---------------- EX ----------------
         new_ex_mem = None
+        ex_busy = False
 
         if id_ex:
 
-            instr = id_ex["instr"]
+            # initialize latency counter
+            if "remaining_ex" not in id_ex:
+                id_ex["remaining_ex"] = config.get_latency(id_ex["instr"].opcode)
 
-            rs1 = id_ex["rs1"]
-            rs2 = id_ex["rs2"]
-            imm = id_ex["imm"]
+            id_ex["remaining_ex"] -= 1
 
-            if instr.opcode == "ADD":
-                alu = rs1 + rs2
-
-            elif instr.opcode == "SUB":
-                alu = rs1 - rs2
-
-            elif instr.opcode == "ADDI":
-                alu = rs1 + imm
-
-            elif instr.opcode in ("LW","SW"):
-                alu = rs1 + imm
-
-            elif instr.opcode == "JAL":
-                alu = id_ex["pc"] + 4
-
+            if id_ex["remaining_ex"] > 0:
+                ex_busy = True
             else:
-                alu = None
 
-            if instr.opcode == "SW":
-                new_ex_mem = {"instr":instr,"alu":alu,"store":rs2}
+                instr = id_ex["instr"]
+                rs1 = id_ex["rs1"]
+                rs2 = id_ex["rs2"]
+                imm = id_ex["imm"]
 
-            elif instr.opcode in ("ADD","SUB","ADDI","LW","JAL"):
-                new_ex_mem = {"instr":instr,"alu":alu}
+                if instr.opcode == "ADD":
+                    alu = rs1 + rs2
 
-            else:
-                new_ex_mem = {"instr":None}
+                elif instr.opcode == "SUB":
+                    alu = rs1 - rs2
+
+                elif instr.opcode == "ADDI":
+                    alu = rs1 + imm
+
+                elif instr.opcode in ("LW", "SW"):
+                    alu = rs1 + imm
+
+                elif instr.opcode == "JAL":
+                    alu = id_ex["pc"] + 4
+
+                else:
+                    alu = None
+
+                if instr.opcode == "SW":
+                    new_ex_mem = {"instr": instr, "alu": alu, "store": rs2}
+
+                elif instr.opcode in ("ADD", "SUB", "ADDI", "LW", "JAL"):
+                    new_ex_mem = {"instr": instr, "alu": alu}
+
+                else:
+                    new_ex_mem = {"instr": None}
+
+                id_ex = None
 
 
         # ---------------- ID ----------------
@@ -105,10 +116,12 @@ def run_pipeline(cpu, instructions, max_cycles=100000, verbose=False):
         branch_taken = False
         branch_target = None
 
-        if if_id:
+        if ex_busy:
+            stall = True
+
+        if if_id and not stall:
 
             instr = if_id
-
             srcs = []
 
             if instr.rs1 is not None:
@@ -118,21 +131,21 @@ def run_pipeline(cpu, instructions, max_cycles=100000, verbose=False):
                 if instr.rd is not None:
                     srcs.append(instr.rd)
             else:
-                if instr.rs2 is not None and instr.opcode not in ("ADDI","JAL"):
+                if instr.rs2 is not None and instr.opcode not in ("ADDI", "JAL"):
                     srcs.append(instr.rs2)
-
 
             # -------- hazard detection --------
             if id_ex and will_write_rd(id_ex["instr"]):
-                if id_ex["instr"].rd in srcs:
+                rd = id_ex["instr"].rd
+                if rd != 0 and rd in srcs:
                     stall = True
 
             if ex_mem and ex_mem.get("instr") and will_write_rd(ex_mem["instr"]):
-                if ex_mem["instr"].rd in srcs:
+                rd = ex_mem["instr"].rd
+                if rd != 0 and rd in srcs:
                     stall = True
 
 
-            # -------- decode --------
             if not stall:
 
                 rs1_val = cpu.read_reg(instr.rs1) if instr.rs1 is not None else 0
@@ -142,27 +155,23 @@ def run_pipeline(cpu, instructions, max_cycles=100000, verbose=False):
                 else:
                     rs2_val = cpu.read_reg(instr.rs2) if instr.rs2 is not None else 0
 
-
-                # ---------- branch compare ----------
+                # -------- branch compare --------
                 if instr.opcode == "BEQ":
-
                     if rs1_val == rs2_val:
                         branch_taken = True
                         branch_target = instr.target
 
                 elif instr.opcode == "BNE":
-
                     if rs1_val != rs2_val:
                         branch_taken = True
                         branch_target = instr.target
 
-
                 new_id_ex = {
-                    "instr":instr,
-                    "pc":pc,
-                    "rs1":rs1_val,
-                    "rs2":rs2_val,
-                    "imm":instr.imm
+                    "instr": instr,
+                    "pc": pc,
+                    "rs1": rs1_val,
+                    "rs2": rs2_val,
+                    "imm": instr.imm
                 }
 
 
@@ -171,10 +180,9 @@ def run_pipeline(cpu, instructions, max_cycles=100000, verbose=False):
 
 
         # ---------------- IF ----------------
-
         new_if_id = None
 
-        if not stall:
+        if not stall and not ex_busy:
 
             fetched = fetch(pc)
 
@@ -189,23 +197,26 @@ def run_pipeline(cpu, instructions, max_cycles=100000, verbose=False):
 
 
         # ---------------- branch flush ----------------
-
         if branch_taken:
-            if pc+4!= branch_target:
-              pc = branch_target
-              new_if_id = None
-              flushes += 1
+
+            if pc + 4 != branch_target:
+
+                pc = branch_target
+                new_if_id = None
+                flushes += 1
+
             else:
-              pc=branch_target
-              new_if_id = None
+
+                pc = branch_target
+                new_if_id = None
 
 
         # ---------------- pipeline update ----------------
 
-        if stall:
-            id_ex = None
-        else:
+        if not ex_busy:
             id_ex = new_id_ex
+
+        if not stall and not ex_busy:
             if_id = new_if_id
 
         ex_mem = new_ex_mem
@@ -217,7 +228,7 @@ def run_pipeline(cpu, instructions, max_cycles=100000, verbose=False):
             id_ex is None and
             ex_mem is None and
             mem_wb is None and
-            pc >= len(instructions)*4
+            pc >= len(instructions) * 4
         )
 
         if done:
@@ -227,8 +238,8 @@ def run_pipeline(cpu, instructions, max_cycles=100000, verbose=False):
     cpu.pc = pc
 
     if verbose:
-        print("Cycles:",cycles)
-        print("Stalls:",stalls)
-        print("Flushes:",flushes)
+        print("Cycles:", cycles)
+        print("Stalls:", stalls)
+        print("Flushes:", flushes)
 
-    return {"cycles":cycles,"stalls":stalls,"flushes":flushes}
+    return {"cycles": cycles, "stalls": stalls, "flushes": flushes}

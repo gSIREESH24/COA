@@ -1,4 +1,5 @@
 import sys
+from config import Config
 from parser import Parser
 from cpu import Cpu
 from executor import run_program
@@ -14,6 +15,10 @@ def main():
         return
 
     assembly_file = sys.argv[1]
+    config_file = sys.argv[2]
+    
+    config = Config(config_file)
+    print(f"Config loaded: Memory Size={config.memory_size} bytes, Forwarding={config.forwarding}, Latencies={config.latency}")
 
     parser = Parser()
     instructions = parser.instr(assembly_file)
@@ -22,7 +27,8 @@ def main():
 
     cpu = Cpu()
 
-    run_pipeline(cpu, instructions, verbose=True)
+    # Use pipelined runner (handles hazards by stalling)
+    run_pipeline(cpu, instructions, config, verbose=True)
 
     print("\nFinal CPU state:")
     print(cpu)

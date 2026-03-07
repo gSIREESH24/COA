@@ -1,6 +1,10 @@
-MemorySize=4096
-Forwarding=true
+MemorySize=1024
+Forwarding=false
 
-latency_ADD=1
-latency_SUB=4
-latency_SW=2
+Latency_ADD=3
+Latency_SUB=1
+Latency_ADDI=2
+Latency_LW=2
+Latency_SW=1
+Latency_BNE=2
+Latency_BEQ=1
