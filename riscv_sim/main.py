@@ -21,20 +21,22 @@ def main():
     print(f"Config loaded: Memory Size={config.memory_size} bytes, Forwarding={config.forwarding}, Latencies={config.latency}")
 
     parser = Parser()
-    instructions = parser.instr(assembly_file)
+    instructions, data_memory, data_labels = parser.instr(assembly_file)
 
     print("Instructions parsed:", len(instructions))
 
     cpu = Cpu()
 
-    # Use pipelined runner (handles hazards by stalling)
+    for addr,val in data_memory.items():
+        cpu.store(addr,val)
+
     run_pipeline(cpu, instructions, config, verbose=True)
 
     print("\nFinal CPU state:")
     print(cpu)
 
     print("\nFirst 32 bytes of memory:")
-    print(list(cpu.memory[:32]))
+    print(list(cpu.memory[1024:1056]))
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 class Instruction:
+
     def __init__(self, opcode, rd=None, rs1=None, rs2=None, imm=None, target=None):
         self.opcode = opcode
         self.rd = rd
@@ -13,7 +14,6 @@ class Instruction:
             raise ValueError(f"Invalid register: {reg}")
         return int(reg[1:])
 
-
     @staticmethod
     def parser_file(file_path):
 
@@ -21,7 +21,14 @@ class Instruction:
         labels = {}
         raw_lines = []
 
+        data_memory = {}
+        data_labels = {}
+
+        section = "text"
+        data_address = 1024
+
         with open(file_path) as f:
+
             for line in f:
 
                 line = line.strip()
@@ -32,18 +39,51 @@ class Instruction:
                 if not line:
                     continue
 
-                if line.endswith(":"):
-                    lbl = line[:-1].strip().upper()
-                    labels[lbl] = len(raw_lines) * 4
+                if line == ".data":
+                    section = "data"
                     continue
 
-                raw_lines.append(line)
+                if line == ".text":
+                    section = "text"
+                    continue
 
+                # -------- DATA SECTION --------
+                if section == "data":
+
+                    if ":" in line:
+
+                        label, value = line.split(":")
+                        label = label.strip()
+                        value = value.strip()
+
+                        if value.startswith(".word"):
+
+                            nums = value.replace(".word", "").split(",")
+
+                            data_labels[label] = data_address
+
+                            for n in nums:
+                                val = int(n.strip())
+                                data_memory[data_address] = val
+                                data_address += 4
+
+                    continue
+
+                # -------- TEXT SECTION --------
+                if section == "text":
+
+                    if line.endswith(":"):
+                        lbl = line[:-1].strip().upper()
+                        labels[lbl] = len(raw_lines) * 4
+                        continue
+
+                    raw_lines.append(line)
+
+        # -------- PASS 2 : Parse instructions --------
         for idx, line in enumerate(raw_lines):
 
             parts = line.replace(",", " ").replace("(", " ").replace(")", " ").split()
             opcode = parts[0].upper()
-
             pc = idx * 4
 
             if opcode in ["ADD", "SUB"]:
@@ -62,35 +102,58 @@ class Instruction:
 
                 instructions.append(Instruction(opcode, rd, rs1, imm=imm))
 
-            elif opcode in ["LW", "SW"]:
+            elif opcode == "SLLI":
 
                 rd = Instruction.reg_num(parts[1])
-                imm = int(parts[2])
-                rs1 = Instruction.reg_num(parts[3])
+                rs1 = Instruction.reg_num(parts[2])
+                imm = int(parts[3])
 
                 instructions.append(Instruction(opcode, rd, rs1, imm=imm))
 
-            elif opcode in ["BEQ", "BNE"]:
-              rs1 = Instruction.reg_num(parts[1])
-              rs2 = Instruction.reg_num(parts[2])
-              target_str = parts[3]
+            elif opcode in ["LW","SW"]:
 
-              if target_str.lstrip("-").isdigit():
+                rd = Instruction.reg_num(parts[1])
 
-                  offset = int(target_str)
-                  target = pc + offset
+                # lw x11,size
+                if len(parts) == 3 and parts[2] in data_labels:
+                    imm = data_labels[parts[2]]
+                    rs1 = 0
+                else:
+                    imm = int(parts[2])
+                    rs1 = Instruction.reg_num(parts[3])
 
-              else:
+                instructions.append(Instruction(opcode, rd, rs1, imm=imm))
 
-                  lbl = target_str.upper()
-                  if lbl not in labels:
-                      raise ValueError(f"Unknown label: {target_str}")
+            elif opcode == "LA":
 
-                  target = labels[lbl]
+                rd = Instruction.reg_num(parts[1])
+                label = parts[2]
 
-              instructions.append(
-                  Instruction(opcode, rs1=rs1, rs2=rs2, target=target)
-              )
+                if label not in data_labels:
+                    raise ValueError(f"Unknown label {label}")
+
+                addr = data_labels[label]
+
+                instructions.append(
+                    Instruction("ADDI", rd, 0, imm=addr)
+                )
+
+            elif opcode in ["BEQ","BNE","BGE","BLE"]:
+
+                rs1 = Instruction.reg_num(parts[1])
+                rs2 = Instruction.reg_num(parts[2])
+                target_str = parts[3]
+
+                if target_str.lstrip("-").isdigit():
+                    offset = int(target_str)
+                    target = pc + offset * 4
+                else:
+                    target = labels[target_str.upper()]
+
+                instructions.append(
+                    Instruction(opcode, rs1=rs1, rs2=rs2, target=target)
+                )
+
             elif opcode == "JAL":
 
                 rd = Instruction.reg_num(parts[1])
@@ -102,19 +165,26 @@ class Instruction:
                 else:
                     target = labels[target_str.upper()]
 
-                instructions.append(Instruction(opcode, rd=rd, target=target))
+                instructions.append(
+                    Instruction(opcode, rd=rd, target=target)
+                )
 
             else:
                 raise ValueError(f"Unknown instruction: {opcode}")
 
-        return instructions
+        return instructions, data_memory, data_labels
 
 
 class Parser:
 
     def __init__(self):
         self.instructions = []
+        self.data_memory = {}
+        self.data_labels = {}
 
     def instr(self, file_path):
-        self.instructions = Instruction.parser_file(file_path)
-        return self.instructions
+
+        self.instructions, self.data_memory, self.data_labels = \
+            Instruction.parser_file(file_path)
+
+        return self.instructions, self.data_memory, self.data_labels
