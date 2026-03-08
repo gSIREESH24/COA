@@ -4,7 +4,7 @@ addi x2,x0,20
 add x3,x1,x2
 sub x4,x2,x1
 
-addi x5,x0,100
+addi x5,x0,10
 
 sw x3,0(x5)
 lw x6,0(x5)
