@@ -59,4 +59,4 @@ next_i:
 exit:
 
     # infinite loop (program end)
-    jal   x0, exit
+    jal x0 , exit

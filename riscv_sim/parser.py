@@ -47,7 +47,7 @@ class Instruction:
                     section = "text"
                     continue
 
-                # -------- DATA SECTION --------
+                # ---------------- DATA ----------------
                 if section == "data":
 
                     if ":" in line:
@@ -69,7 +69,7 @@ class Instruction:
 
                     continue
 
-                # -------- TEXT SECTION --------
+                # ---------------- TEXT ----------------
                 if section == "text":
 
                     if line.endswith(":"):
@@ -79,13 +79,14 @@ class Instruction:
 
                     raw_lines.append(line)
 
-        # -------- PASS 2 : Parse instructions --------
+        # ---------------- PASS 2 ----------------
         for idx, line in enumerate(raw_lines):
 
             parts = line.replace(",", " ").replace("(", " ").replace(")", " ").split()
             opcode = parts[0].upper()
             pc = idx * 4
 
+            # -------- R TYPE --------
             if opcode in ["ADD", "SUB"]:
 
                 rd = Instruction.reg_num(parts[1])
@@ -94,6 +95,7 @@ class Instruction:
 
                 instructions.append(Instruction(opcode, rd, rs1, rs2))
 
+            # -------- I TYPE --------
             elif opcode == "ADDI":
 
                 rd = Instruction.reg_num(parts[1])
@@ -110,11 +112,11 @@ class Instruction:
 
                 instructions.append(Instruction(opcode, rd, rs1, imm=imm))
 
-            elif opcode in ["LW","SW"]:
+            # -------- LOAD / STORE --------
+            elif opcode in ["LW", "SW"]:
 
                 rd = Instruction.reg_num(parts[1])
 
-                # lw x11,size
                 if len(parts) == 3 and parts[2] in data_labels:
                     imm = data_labels[parts[2]]
                     rs1 = 0
@@ -124,6 +126,7 @@ class Instruction:
 
                 instructions.append(Instruction(opcode, rd, rs1, imm=imm))
 
+            # -------- LA --------
             elif opcode == "LA":
 
                 rd = Instruction.reg_num(parts[1])
@@ -138,6 +141,7 @@ class Instruction:
                     Instruction("ADDI", rd, 0, imm=addr)
                 )
 
+            # -------- BRANCH --------
             elif opcode in ["BEQ","BNE","BGE","BLE"]:
 
                 rs1 = Instruction.reg_num(parts[1])
@@ -154,6 +158,7 @@ class Instruction:
                     Instruction(opcode, rs1=rs1, rs2=rs2, target=target)
                 )
 
+            # -------- JAL --------
             elif opcode == "JAL":
 
                 rd = Instruction.reg_num(parts[1])
