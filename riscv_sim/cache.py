@@ -6,7 +6,7 @@ class CacheBlock:
         self.data = data
         self.valid = valid
         self.access_time = 0
-        self.insertion_time = 0
+        self.frequency = 0
 
 
 class Cache:
@@ -53,6 +53,7 @@ class Cache:
             if block.valid and block.tag == tag:
                 self.cache_hits += 1
                 block.access_time = self.access_counter
+                block.frequency += 1
                 if is_write:
                     block.data = data
                 return True, self.latency, block.data
@@ -65,23 +66,31 @@ class Cache:
         block.data = data
         block.valid = True
         block.access_time = self.access_counter
-        block.insertion_time = self.access_counter
+        block.frequency = 1
         
         return False, self.latency, data
     
     def _find_victim(self, cache_set):
-        min_time = float('inf')
-        victim_index = 0
-        
         for i, block in enumerate(cache_set):
             if not block.valid:
                 return i
-            time_to_check = block.access_time if self.replacement_policy == "LRU" else block.insertion_time
-            if time_to_check < min_time:
-                min_time = time_to_check
-                victim_index = i
-        
-        return victim_index
+                
+        if self.replacement_policy == "LFU":
+            min_freq = float('inf')
+            victim_index = 0
+            for i, block in enumerate(cache_set):
+                if block.frequency < min_freq:
+                    min_freq = block.frequency
+                    victim_index = i
+            return victim_index
+        else: # Default to LRU
+            min_time = float('inf')
+            victim_index = 0
+            for i, block in enumerate(cache_set):
+                if block.access_time < min_time:
+                    min_time = block.access_time
+                    victim_index = i
+            return victim_index
     
     def get_miss_rate(self):
         return 0.0 if self.total_accesses == 0 else self.cache_misses / self.total_accesses
