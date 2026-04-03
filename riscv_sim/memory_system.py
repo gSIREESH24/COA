@@ -41,46 +41,65 @@ class MemorySystem:
         address = address & ~3
         
         if access_type == "IF":
-            hit_l1, lat1, data = self.l1i.access(address)
+            hit_l1, lat1, data, _ = self.l1i.access(address)
             if hit_l1:
                 return lat1, True
             
-            hit_l2, lat2, data = self.l2.access(address)
+            hit_l2, lat2, data, evicted_addr = self.l2.access(address)
+            if evicted_addr is not None:
+                self.l1i.invalidate(evicted_addr)
+                self.l1d.invalidate(evicted_addr)
+                
             if hit_l2:
                 self.l1i.access(address, data)
                 return lat1 + lat2, True
                 
             data = self._read_from_memory(address)
-            self.l2.access(address, data)
+            _, _, _, evicted_addr2 = self.l2.access(address, data)
+            if evicted_addr2 is not None:
+                self.l1i.invalidate(evicted_addr2)
+                self.l1d.invalidate(evicted_addr2)
+                
             self.l1i.access(address, data)
             
             return lat1 + lat2 + self.main_memory_latency, False
             
         elif access_type == "LOAD":
-            hit_l1, lat1, data = self.l1d.access(address)
+            hit_l1, lat1, data, _ = self.l1d.access(address)
             if hit_l1:
                 return lat1, True
             
-            hit_l2, lat2, data = self.l2.access(address)
+            hit_l2, lat2, data, evicted_addr = self.l2.access(address)
+            if evicted_addr is not None:
+                self.l1i.invalidate(evicted_addr)
+                self.l1d.invalidate(evicted_addr)
+                
             if hit_l2:
                 self.l1d.access(address, data)
                 return lat1 + lat2, True
             
             data = self._read_from_memory(address)
-            self.l2.access(address, data)
+            _, _, _, evicted_addr2 = self.l2.access(address, data)
+            if evicted_addr2 is not None:
+                self.l1i.invalidate(evicted_addr2)
+                self.l1d.invalidate(evicted_addr2)
+                
             self.l1d.access(address, data)
             
             return lat1 + lat2 + self.main_memory_latency, False
             
         elif access_type == "STORE":
             value = value & 0xFFFFFFFF
-            hit_l1, lat1, _ = self.l1d.access(address, value, is_write=True)
+            hit_l1, lat1, _, _ = self.l1d.access(address, value, is_write=True)
             
             if hit_l1:
                 self._write_to_memory(address, value)
                 return lat1, True
             
-            hit_l2, lat2, _ = self.l2.access(address, value, is_write=True)
+            hit_l2, lat2, _, evicted_addr = self.l2.access(address, value, is_write=True)
+            if evicted_addr is not None:
+                self.l1i.invalidate(evicted_addr)
+                self.l1d.invalidate(evicted_addr)
             
             if hit_l2:
                 self.l1d.access(address, value, is_write=True)
@@ -88,7 +107,11 @@ class MemorySystem:
                 return lat1 + lat2, True
             
             self._write_to_memory(address, value)
-            self.l2.access(address, value)
+            _, _, _, evicted_addr2 = self.l2.access(address, value)
+            if evicted_addr2 is not None:
+                self.l1i.invalidate(evicted_addr2)
+                self.l1d.invalidate(evicted_addr2)
+                
             self.l1d.access(address, value)
             
             return lat1 + lat2 + self.main_memory_latency, False

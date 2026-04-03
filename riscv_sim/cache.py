@@ -56,19 +56,24 @@ class Cache:
                 block.frequency += 1
                 if is_write:
                     block.data = data
-                return True, self.latency, block.data
+                return True, self.latency, block.data, None
         
         self.cache_misses += 1
         
         victim_index = self._find_victim(cache_set)
         block = cache_set[victim_index]
+        
+        evicted_address = None
+        if block.valid:
+            evicted_address = (block.tag << (self.block_offset_bits + self.set_index_bits)) | (set_index << self.block_offset_bits)
+            
         block.tag = tag
         block.data = data
         block.valid = True
         block.access_time = self.access_counter
         block.frequency = 1
         
-        return False, self.latency, data
+        return False, self.latency, data, evicted_address
     
     def _find_victim(self, cache_set):
         for i, block in enumerate(cache_set):
@@ -83,7 +88,7 @@ class Cache:
                     min_freq = block.frequency
                     victim_index = i
             return victim_index
-        else: # Default to LRU
+        else:
             min_time = float('inf')
             victim_index = 0
             for i, block in enumerate(cache_set):
@@ -114,3 +119,14 @@ class Cache:
                 block.valid = False
                 block.tag = None
                 block.data = None
+
+    def invalidate(self, address):
+        tag = self._get_tag(address)
+        set_index = self._get_set_index(address)
+        cache_set = self.cache[set_index]
+        
+        for block in cache_set:
+            if block.valid and block.tag == tag:
+                block.valid = False
+                return True
+        return False
