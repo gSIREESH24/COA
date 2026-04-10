@@ -3,18 +3,23 @@ def will_write_rd(instr):
         return False
     return instr.opcode in ("ADD", "SUB", "ADDI", "LW", "JAL", "SLLI") and instr.rd is not None
 
+
 def forward_value(reg, ex_mem, mem_wb):
     if reg is None:
         return False, None
+
     if ex_mem and ex_mem.get("instr"):
         instr = ex_mem["instr"]
         if instr.opcode != "LW" and will_write_rd(instr) and instr.rd == reg and reg != 0:
             return True, ex_mem["alu"]
+
     if mem_wb and mem_wb.get("instr"):
         instr = mem_wb["instr"]
         if will_write_rd(instr) and instr.rd == reg and reg != 0:
             return True, mem_wb["val"]
+
     return False, None
+
 
 def run_pipeline(cpu, instructions, config, max_cycles=1000000, verbose=False):
     pc = cpu.pc
@@ -27,7 +32,7 @@ def run_pipeline(cpu, instructions, config, max_cycles=1000000, verbose=False):
     stalls = 0
     flushes = 0
     instructions_executed = 0
-    
+
     if_stalls = 0
     cache_stalls = 0
 
@@ -42,6 +47,7 @@ def run_pipeline(cpu, instructions, config, max_cycles=1000000, verbose=False):
     while cycles < max_cycles:
         cycles += 1
 
+        # Write-back stage
         if mem_wb:
             instr = mem_wb["instr"]
             if instr:
@@ -52,6 +58,7 @@ def run_pipeline(cpu, instructions, config, max_cycles=1000000, verbose=False):
         new_mem_wb = None
         mem_busy = False
 
+        # Memory stage
         if ex_mem:
             if "latency" not in ex_mem:
                 instr = ex_mem["instr"]
@@ -87,6 +94,7 @@ def run_pipeline(cpu, instructions, config, max_cycles=1000000, verbose=False):
         new_ex_mem = None
         ex_busy = False
 
+        # Execute stage
         if not mem_busy:
             if id_ex:
                 id_ex["latency"] -= 1
@@ -99,9 +107,11 @@ def run_pipeline(cpu, instructions, config, max_cycles=1000000, verbose=False):
 
                     if config.forwarding:
                         f, v = forward_value(id_ex["rs1_reg"], ex_mem, mem_wb)
-                        if f: rs1 = v
+                        if f:
+                            rs1 = v
                         f, v = forward_value(id_ex["rs2_reg"], ex_mem, mem_wb)
-                        if f: rs2 = v
+                        if f:
+                            rs2 = v
 
                     imm = id_ex["imm"]
 
@@ -124,7 +134,8 @@ def run_pipeline(cpu, instructions, config, max_cycles=1000000, verbose=False):
                         store_val = cpu.read_reg(instr.rd)
                         if config.forwarding:
                             f, v = forward_value(instr.rd, ex_mem, mem_wb)
-                            if f: store_val = v
+                            if f:
+                                store_val = v
                         new_ex_mem = {"instr": instr, "alu": alu, "store": store_val}
                     elif will_write_rd(instr):
                         new_ex_mem = {"instr": instr, "alu": alu}
@@ -134,12 +145,14 @@ def run_pipeline(cpu, instructions, config, max_cycles=1000000, verbose=False):
             if id_ex:
                 ex_busy = True
 
+        global_stall = mem_busy or ex_busy
         stall = False
         branch_taken = False
         branch_target = None
         new_id_ex = None
 
-        if if_id:
+        # ID stage
+        if if_id and not global_stall:
             instr = if_id["instr"]
             instr_pc = if_id["pc"]
 
@@ -177,9 +190,11 @@ def run_pipeline(cpu, instructions, config, max_cycles=1000000, verbose=False):
 
                 if config.forwarding:
                     f, v = forward_value(instr.rs1, ex_mem, mem_wb)
-                    if f: rs1_val = v
+                    if f:
+                        rs1_val = v
                     f, v = forward_value(instr.rs2, ex_mem, mem_wb)
-                    if f: rs2_val = v
+                    if f:
+                        rs2_val = v
 
                 if instr.opcode == "BEQ":
                     if rs1_val == rs2_val:
@@ -209,9 +224,13 @@ def run_pipeline(cpu, instructions, config, max_cycles=1000000, verbose=False):
                     "rs1_reg": instr.rs1,
                     "rs2_reg": instr.rs2,
                     "imm": instr.imm,
-                    "latency": lat
+                    "latency": lat,
                 }
 
+        if global_stall:
+            new_id_ex = id_ex
+
+        # IF stage
         new_if_id = if_id
 
         if branch_taken:
@@ -221,31 +240,36 @@ def run_pipeline(cpu, instructions, config, max_cycles=1000000, verbose=False):
             flushes += 1
             if_latency = 0
             if_fetching = False
+
+        elif stall or global_stall:
+            new_if_id = if_id
+            stalls += 1
+
         else:
-            if stall:
-                new_if_id = if_id
-                stalls += 1
-            else:
-                if not if_fetching:
-                    fetched_instr = fetch(pc)
-                    if fetched_instr:
-                        cpu.fetch_instruction(pc)
-                        if_latency = cpu._last_instruction_latency
-                        if_fetching = True
-                    else:
-                        new_if_id = None
+            # Start fetch once for the current PC
+            if not if_fetching:
+                fetched_instr = fetch(pc)
+                if fetched_instr:
+                    cpu.fetch_instruction(pc)
+                    if_latency = cpu._last_instruction_latency
+                    if_fetching = True
+                else:
+                    new_if_id = None
 
-                if if_fetching:
-                    if_latency -= 1
-                    if if_latency == 0:
-                        new_if_id = {"instr": fetch(pc), "pc": pc}
-                        pc += 4
-                        if_fetching = False
-                    else:
-                        new_if_id = None
-                        stalls += 1
-                        if_stalls += 1
+            # Continue fetch countdown
+            if if_fetching:
+                if_latency -= 1
 
+                if if_latency <= 0:
+                    new_if_id = {"instr": fetch(pc), "pc": pc}
+                    pc += 4
+                    if_fetching = False
+                else:
+                    new_if_id = None
+                    stalls += 1
+                    if_stalls += 1
+
+        # Update pipeline registers
         if not mem_busy:
             mem_wb = new_mem_wb
             ex_mem = new_ex_mem
@@ -255,10 +279,10 @@ def run_pipeline(cpu, instructions, config, max_cycles=1000000, verbose=False):
         if not ex_busy and not mem_busy:
             id_ex = new_id_ex
 
-        if not stall and not branch_taken:
-            if_id = new_if_id
-        elif branch_taken:
+        if branch_taken:
             if_id = None
+        elif not stall and not global_stall:
+            if_id = new_if_id
 
         done = (
             if_id is None and
@@ -290,5 +314,5 @@ def run_pipeline(cpu, instructions, config, max_cycles=1000000, verbose=False):
         "flushes": flushes,
         "ipc": ipc,
         "cache_stalls": cache_stalls,
-        "if_stalls": if_stalls
+        "if_stalls": if_stalls,
     }

@@ -1,5 +1,5 @@
 MemorySize=4096
-Forwarding=false
+Forwarding=True
 
 Latency_ADD=1
 Latency_SUB=1
@@ -24,7 +24,7 @@ L1D_ReplacementPolicy=LRU
 L2_Size=262144
 L2_BlockSize=64
 L2_Associativity=8
-L2_Latency=10
+L2_Latency=1
 L2_ReplacementPolicy=LRU
 
-MainMemory_Latency=100
+MainMemory_Latency=1
