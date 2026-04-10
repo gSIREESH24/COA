@@ -27,4 +27,4 @@ loop:
     jal  x0, loop
 
 end:
-    jal x0, end
+    addi x0, x0, 0

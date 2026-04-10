@@ -4,10 +4,10 @@ class Cpu:
         self.pc = 0
         self.memory_system = memory_system
         self.memory = bytearray(memory_size) if memory_system is None else memory_system.get_memory()
-        
+
         self._last_access_latency = 1
         self._last_instruction_latency = 1
-        
+
     def read_reg(self, reg_num):
         if reg_num == 0:
             return 0
@@ -23,11 +23,14 @@ class Cpu:
             self._last_access_latency = latency
         else:
             self._last_access_latency = 1
-            
-        b0 = self.memory[address]
-        b1 = self.memory[address + 1]
-        b2 = self.memory[address + 2]
-        b3 = self.memory[address + 3]
+
+        addr = address % len(self.memory)
+        
+        b0 = self.memory[addr]
+        b1 = self.memory[(addr + 1) % len(self.memory)]
+        b2 = self.memory[(addr + 2) % len(self.memory)]
+        b3 = self.memory[(addr + 3) % len(self.memory)]
+        
         return b0 | (b1 << 8) | (b2 << 16) | (b3 << 24)
 
     def store(self, address, value):
@@ -36,26 +39,31 @@ class Cpu:
             self._last_access_latency = latency
         else:
             self._last_access_latency = 1
-            
+
         value &= 0xFFFFFFFF
-        self.memory[address] = value & 0xFF
-        self.memory[address + 1] = (value >> 8) & 0xFF
-        self.memory[address + 2] = (value >> 16) & 0xFF
-        self.memory[address + 3] = (value >> 24) & 0xFF
-    
+        addr = address % len(self.memory)
+        
+        self.memory[addr] = value & 0xFF
+        self.memory[(addr + 1) % len(self.memory)] = (value >> 8) & 0xFF
+        self.memory[(addr + 2) % len(self.memory)] = (value >> 16) & 0xFF
+        self.memory[(addr + 3) % len(self.memory)] = (value >> 24) & 0xFF
+
     def fetch_instruction(self, address):
         if self.memory_system:
             latency, hit = self.memory_system.access(address, "IF")
             self._last_instruction_latency = latency
+            return None
         else:
             self._last_instruction_latency = 1
             
-        b0 = self.memory[address]
-        b1 = self.memory[address + 1]
-        b2 = self.memory[address + 2]
-        b3 = self.memory[address + 3]
-        return b0 | (b1 << 8) | (b2 << 16) | (b3 << 24)
-
+            addr = address % len(self.memory)
+            b0 = self.memory[addr]
+            b1 = self.memory[(addr + 1) % len(self.memory)]
+            b2 = self.memory[(addr + 2) % len(self.memory)]
+            b3 = self.memory[(addr + 3) % len(self.memory)]
+            
+            return b0 | (b1 << 8) | (b2 << 16) | (b3 << 24)
+        
     def next_pc(self):
         self.pc += 4
 

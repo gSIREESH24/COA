@@ -1,6 +1,6 @@
 .data
-array:  .word 6,11,3,1,2
-size:   .word 5
+array:  .word 6,11,3,1,2,5,9
+size:   .word 7
 
 .text
 main:
@@ -58,5 +58,4 @@ next_i:
 
 exit:
 
-    # infinite loop (program end)
-    jal x0 , exit
+    addi x0, x0, 0
