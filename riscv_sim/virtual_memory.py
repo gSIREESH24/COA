@@ -177,7 +177,7 @@ class VirtualMemorySubsystem:
                 events["page_fault"] = True
                 penalty += self.page_fault_lat
 
-                frame, evicted, dirty_ev = self._handle_page_fault(vpn, is_write)
+                frame, evicted, dirty_ev, victim_vpn = self._handle_page_fault(vpn, is_write, tlb)
 
                 if evicted:
                     self.stat_evictions += 1
@@ -203,9 +203,10 @@ class VirtualMemorySubsystem:
     def _offset(self, vaddr: int) -> int:
         return (vaddr & 0xFFFFFFFF) & (self.page_size - 1)
 
-    def _handle_page_fault(self, vpn: int, is_write: bool) -> tuple:
+    def _handle_page_fault(self, vpn: int, is_write: bool, tlb=None) -> tuple:
         evicted     = False
         dirty_evict = False
+        victim_vpn  = None
 
         if self.frame_allocator.is_full():
             victim_vpn = self._choose_victim()
@@ -220,6 +221,10 @@ class VirtualMemorySubsystem:
                 self.frame_allocator.free(frame)
                 self._remove_from_tracking(victim_vpn)
 
+            # TLB shootdown: remove the stale TLB entry for the evicted VPN
+            if tlb is not None and victim_vpn is not None:
+                tlb.invalidate(victim_vpn)
+
         frame = self.frame_allocator.allocate()
         pte   = self.page_table.map(vpn, frame)
 
@@ -227,7 +232,7 @@ class VirtualMemorySubsystem:
             pte.dirty = True
 
         self._add_to_tracking(vpn)
-        return frame, evicted, dirty_evict
+        return frame, evicted, dirty_evict, victim_vpn
 
     def _choose_victim(self) -> int:
         if self.replacement_policy == "fifo":

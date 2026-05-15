@@ -25,7 +25,7 @@ def run_trace(trace_file, config_file):
         l2_enabled=cfg.l2_enabled
     )
 
-    regs = [0] * 32       # x0..x31
+    regs = [0] * 32
     cycle = 0
     instructions_retired = 0
     stall_cycles = 0
@@ -53,14 +53,14 @@ def run_trace(trace_file, config_file):
             rs1 = int(parts[2][1:])
             rs2 = int(parts[3][1:])
             regs[rd] = (regs[rs1] + regs[rs2]) & 0xFFFFFFFF
-            cycle += cfg.get_latency('ADD')       # = 1
+            cycle += cfg.get_latency('ADD')
 
         elif op == 'MUL':
             rd  = int(parts[1][1:])
             rs1 = int(parts[2][1:])
             rs2 = int(parts[3][1:])
             regs[rd] = (regs[rs1] * regs[rs2]) & 0xFFFFFFFF
-            lat = cfg.get_latency('MUL')          # = 3
+            lat = cfg.get_latency('MUL')          
             cycle += lat
             stall_cycles += lat - 1
 
