@@ -1,4 +1,8 @@
 ﻿# COA - Computer Organization and Architecture
+ DIRECTIONS ON HOW TO USE RUN THE SIMULATOR:
+use this terminal command below :)
+- make sure u are in the correct directory i.e , the riscv_sim  directory
+cmd:-python riscv_sim/trace_runner.py riscv_sim/phase3_traces/traceXX.trace config_phase3.ini
 
 ## 📋 Meeting Minutes
 
