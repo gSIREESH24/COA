@@ -5,11 +5,7 @@ use this terminal command below :)
 cmd:-python riscv_sim/trace_runner.py riscv_sim/phase3_traces/traceXX.trace config_phase3.ini
 
 ## 📋 Meeting Minutes
-
 ---
----
----
-
 ### 📝 Meeting 14
 **Date:** May 12, 2026
 * **Members:** G Sireesh Reddy, G Siddhardha
