@@ -8,6 +8,41 @@ cmd:-python riscv_sim/trace_runner.py riscv_sim/phase3_traces/traceXX.trace conf
 
 ---
 ---
+---
+
+### 📝 Meeting 14
+**Date:** May 12, 2026
+* **Members:** G Sireesh Reddy, G Siddhardha
+* **Decisions:** Completed integration testing for Phase 3 and finalized statistics collection methodology.
+* **Tasks Assigned:**
+    * [x] **G Sireesh Reddy:** Validate page fault handling, frame allocation, and eviction statistics (Deadline: May 13)
+    * [x] **G Siddhardha:** Generate execution statistics, IPC metrics, and update Phase 3 documentation/report (Deadline: May 13)
+* **Accomplishments from Previous Meeting:**
+    * Successfully implemented trace-driven execution with VM-aware memory accesses and latency handling.
+
+---
+
+### 📝 Meeting 13
+**Date:** May 11, 2026
+* **Members:** G Sireesh Reddy, G Siddhardha
+* **Decisions:** Finalized execution flow between trace runner and virtual memory enabled memory system.
+* **Tasks Assigned:**
+    * [x] **G Sireesh Reddy:** Verify TLB lookup handling, page walk operations, and translation latency calculations (Deadline: May 12)
+    * [x] **G Siddhardha:** Implement LOAD, STORE, ADD, and MUL execution logic with cycle and stall accounting (Deadline: May 12)
+* **Accomplishments from Previous Meeting:**
+    * Successfully connected trace parsing with simulator execution and memory access interface.
+
+---
+
+### 📝 Meeting 12
+**Date:** May 10, 2026
+* **Members:** G Sireesh Reddy, G Siddhardha
+* **Decisions:** Initiated Phase 3 development focusing on virtual memory integration and trace-driven simulation.
+* **Tasks Assigned:**
+    * [x] **G Sireesh Reddy:** Implement virtual memory subsystem components including TLB and page table integration (Deadline: May 11)
+    * [x] **G Siddhardha:** Analyze trace format and begin development of trace replay and instruction parsing system (Deadline: May 11)
+* **Accomplishments from Previous Meeting:**
+    * Successfully completed Phase 2 cache hierarchy implementation and performance metric validation.
 
 ### 📝 Meeting 11
 **Date:** April 5, 2026
